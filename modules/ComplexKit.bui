@@ -1,0 +1,303 @@
+Private Function ComplexHypot(x As Double, y As Double) As Double
+    Dim scale As Double = Math.Max(Math.Abs(x), Math.Abs(y))
+    If scale = 0.0 Then Return 0.0
+    Return scale * Math.Sqrt((x / scale) * (x / scale) + (y / scale) * (y / scale))
+End Function
+
+Private Function ComplexLogHypot(x As Double, y As Double) As Double
+    Dim scale As Double = Math.Max(Math.Abs(x), Math.Abs(y))
+    Return Math.Log(scale) + 0.5 * Math.Log((x / scale) * (x / scale) + (y / scale) * (y / scale))
+End Function
+
+' Small positive log1p via the atanh series; no subtraction of nearly equal logs.
+Private Function ComplexLogOnePlus(x As Double) As Double
+    If x > 0.01 Then Return Math.Log(1.0 + x)
+    Dim t As Double = x / (2.0 + x)
+    Dim term As Double = t
+    Dim total As Double = t
+    For n As Integer = 3 To 13 Step 2
+        term = term * t * t
+        total = total + term / n
+    Next
+    Return 2.0 * total
+End Function
+
+' Compute a hyperbolic factor times a trig factor without first overflowing exp.
+Private Function ComplexHyperProduct(x As Double, factor As Double, odd As Boolean) As Double
+    If factor = 0.0 Then Return 0.0
+    If Math.Abs(x) < 20.0 Then
+        If odd Then Return Math.Sinh(x) * factor
+        Return Math.Cosh(x) * factor
+    End If
+    Dim productValue As Double = Math.Exp(Math.Abs(x) - 0.69314718055994530942 + Math.Log(Math.Abs(factor)))
+    If factor < 0.0 Then productValue = -productValue
+    If odd And x < 0.0 Then productValue = -productValue
+    Return productValue
+End Function
+
+' Elliptic coordinates: real part is asin or acos of x/alpha, imaginary
+' magnitude is acosh(alpha). Retain alpha-1 and alpha-|x| separately.
+Private Function ComplexInverseSine(x As Double, y As Double, cosine As Boolean) As ComplexNumber
+    Dim a As Double = Math.Abs(x)
+    Dim b As Double = Math.Abs(y)
+    Dim angle As Double
+    Dim height As Double
+    If Math.Max(a, b) > 1e150 Then
+        angle = Math.Atan2(x, b)
+        If cosine Then angle = Math.Atan2(b, x)
+        height = ComplexLogHypot(a, b) + 0.69314718055994530942
+    Else
+        Dim r As Double = ComplexHypot(a + 1.0, b)
+        Dim t As Double = ComplexHypot(a - 1.0, b)
+        Dim delta As Double
+        Dim rootGap As Double
+        If a = 1.0 And b = 0.0 Then
+            delta = 0.0
+            rootGap = 0.0
+        ElseIf a <= 1.0 Then
+            delta = 0.5 * b * (b / (r + 1.0 + a)) + 0.5 * b * (b / (t + (1.0 - a)))
+            rootGap = Math.Sqrt(1.0 - a + delta)
+            If a = 1.0 Then rootGap = Math.Sqrt(b) * Math.Sqrt(0.5 * (b / (r + 2.0)) + 0.5)
+        Else
+            Dim correction As Double = 0.5 * (b / (r + a + 1.0)) + 0.5 * (b / (t + (a - 1.0)))
+            delta = a - 1.0 + b * correction
+            rootGap = b * Math.Sqrt(0.5 / (r + a + 1.0) + 0.5 / (t + (a - 1.0)))
+        End If
+        Dim alpha As Double = 1.0 + delta
+        Dim vertical As Double = rootGap * Math.Sqrt(alpha + a)
+        angle = Math.Atan2(x, vertical)
+        If cosine Then angle = Math.Atan2(vertical, x)
+        height = ComplexLogOnePlus(delta + Math.Sqrt(delta) * Math.Sqrt(delta + 2.0))
+        ' When delta underflows, acosh(alpha) still has a representable limit.
+        If b < 1e-150 And a < 1.0 Then height = b / (Math.Sqrt(1.0 - a) * Math.Sqrt(1.0 + a))
+        If a = 1.0 And b < 1e-150 Then height = Math.Sqrt(b)
+    End If
+    If y < 0.0 Then height = -height
+    If cosine Then height = -height
+    Return New ComplexNumber(angle, height)
+End Function
+
+Private Sub RequireFiniteComplexPart(value As Double)
+    If Not (value <= 1.7976931348623157e308 And value >= -1.7976931348623157e308) Then
+        Throw New InvalidArgumentException("Complex components must be finite Doubles")
+    End If
+End Sub
+
+Private Sub RequireComplex(value As ComplexNumber)
+    If value Is Nil Then Throw New InvalidArgumentException("Complex operand must not be Nil")
+    RequireFiniteComplexPart(value.Real)
+    RequireFiniteComplexPart(value.Imaginary)
+End Sub
+
+''' Double precision complex arithmetic; methods return fresh values.
+Public Class ComplexNumber
+    Public Property Real As Double = 0.0
+    Public Property Imaginary As Double = 0.0
+
+    Public Sub Constructor(realPart As Double = 0.0, imaginaryPart As Double = 0.0)
+        RequireFiniteComplexPart(realPart)
+        RequireFiniteComplexPart(imaginaryPart)
+        Real = realPart
+        Imaginary = imaginaryPart
+    End Sub
+
+    Public Function Add(other As ComplexNumber) As ComplexNumber
+        RequireComplex(Me)
+        RequireComplex(other)
+        Return New ComplexNumber(Real + other.Real, Imaginary + other.Imaginary)
+    End Function
+
+    Public Function Subtract(other As ComplexNumber) As ComplexNumber
+        RequireComplex(Me)
+        RequireComplex(other)
+        Return New ComplexNumber(Real - other.Real, Imaginary - other.Imaginary)
+    End Function
+
+    Public Function Multiply(other As ComplexNumber) As ComplexNumber
+        RequireComplex(Me)
+        RequireComplex(other)
+        Return New ComplexNumber(Real * other.Real - Imaginary * other.Imaginary, Real * other.Imaginary + Imaginary * other.Real)
+    End Function
+
+    Public Function Divide(other As ComplexNumber) As ComplexNumber
+        RequireComplex(Me)
+        RequireComplex(other)
+        Dim scale As Double = Math.Max(Math.Abs(other.Real), Math.Abs(other.Imaginary))
+        If scale = 0.0 Then Throw New InvalidArgumentException("Cannot divide by complex zero")
+        Dim c As Double = other.Real / scale
+        Dim d As Double = other.Imaginary / scale
+        Dim denominator As Double = c * c + d * d
+        Dim a As Double = Real / scale
+        Dim b As Double = Imaginary / scale
+        If Not (Math.Abs(a) <= 1.7976931348623157e308 And Math.Abs(b) <= 1.7976931348623157e308) Then
+            ' Apply bounded coefficients before dividing a large numerator by
+            ' a small scale; the final components may still be representable.
+            Return New ComplexNumber((Real * (c / denominator)) / scale + (Imaginary * (d / denominator)) / scale, (Imaginary * (c / denominator)) / scale - (Real * (d / denominator)) / scale)
+        End If
+        Return New ComplexNumber(a * (c / denominator) + b * (d / denominator), b * (c / denominator) - a * (d / denominator))
+    End Function
+
+    Public Function Conjugate() As ComplexNumber
+        RequireComplex(Me)
+        Return New ComplexNumber(Real, -Imaginary)
+    End Function
+
+    Public Function Magnitude() As Double
+        RequireComplex(Me)
+        Dim scale As Double = Math.Max(Math.Abs(Real), Math.Abs(Imaginary))
+        If scale = 0.0 Then Return 0.0
+        Dim a As Double = Real / scale
+        Dim b As Double = Imaginary / scale
+        Dim magnitudeValue As Double = scale * Math.Sqrt(a * a + b * b)
+        RequireFiniteComplexPart(magnitudeValue)
+        Return magnitudeValue
+    End Function
+
+    ''' Principal argument in radians; the convention for zero is zero.
+    Public Function Argument() As Double
+        RequireComplex(Me)
+        If Real = 0.0 And Imaginary = 0.0 Then Return 0.0
+        Return Math.Atan2(Imaginary, Real)
+    End Function
+
+    Public Function Exp() As ComplexNumber
+        RequireComplex(Me)
+        Dim scale As Double = Math.Exp(Real)
+        Return New ComplexNumber(scale * Math.Cos(Imaginary), scale * Math.Sin(Imaginary))
+    End Function
+
+    Public Function Log() As ComplexNumber
+        RequireComplex(Me)
+        Dim scale As Double = Math.Max(Math.Abs(Real), Math.Abs(Imaginary))
+        If scale = 0.0 Then Throw New InvalidArgumentException("Complex logarithm is undefined at zero")
+        Dim a As Double = Real / scale
+        Dim b As Double = Imaginary / scale
+        Return New ComplexNumber(Math.Log(scale) + 0.5 * Math.Log(a * a + b * b), Argument())
+    End Function
+
+    ''' Principal square root; negative real inputs use the positive imaginary root.
+    Public Function Sqrt() As ComplexNumber
+        RequireComplex(Me)
+        Dim scale As Double = Math.Max(Math.Abs(Real), Math.Abs(Imaginary))
+        If scale = 0.0 Then Return New ComplexNumber()
+        Dim a As Double = Real / scale
+        Dim b As Double = Imaginary / scale
+        Dim largest As Double = Math.Sqrt(scale) * Math.Sqrt((Math.Sqrt(a * a + b * b) + Math.Abs(a)) / 2.0)
+        If Real >= 0.0 Then Return New ComplexNumber(largest, Imaginary / (2.0 * largest))
+        Dim imaginaryRoot As Double = largest
+        If Imaginary < 0.0 Then imaginaryRoot = -largest
+        Return New ComplexNumber(Math.Abs(Imaginary) / (2.0 * largest), imaginaryRoot)
+    End Function
+
+    Public Function Sin() As ComplexNumber
+        RequireComplex(Me)
+        Return New ComplexNumber(Math.Sin(Real) * Math.Cosh(Imaginary), Math.Cos(Real) * Math.Sinh(Imaginary))
+    End Function
+
+    Public Function Cos() As ComplexNumber
+        RequireComplex(Me)
+        Return New ComplexNumber(Math.Cos(Real) * Math.Cosh(Imaginary), -Math.Sin(Real) * Math.Sinh(Imaginary))
+    End Function
+
+    Public Function Tan() As ComplexNumber
+        Return Sin().Divide(Cos())
+    End Function
+
+    Public Function Sinh() As ComplexNumber
+        RequireComplex(Me)
+        Return New ComplexNumber(ComplexHyperProduct(Real, Math.Cos(Imaginary), True), ComplexHyperProduct(Real, Math.Sin(Imaginary), False))
+    End Function
+
+    Public Function Cosh() As ComplexNumber
+        RequireComplex(Me)
+        Return New ComplexNumber(ComplexHyperProduct(Real, Math.Cos(Imaginary), False), ComplexHyperProduct(Real, Math.Sin(Imaginary), True))
+    End Function
+
+    Public Function Tanh() As ComplexNumber
+        RequireComplex(Me)
+        If Real = 0.0 And Math.Abs(Imaginary) = Math.Pi / 2.0 Then Throw New InvalidArgumentException("Complex tanh pole")
+        Dim c As Double = Math.Cos(Imaginary)
+        Dim s As Double = Math.Sin(Imaginary)
+        If Math.Abs(Real) < 20.0 Then
+            Dim h As Double = Math.Sinh(Real)
+            Dim denominator As Double = h * h + c * c
+            If denominator = 0.0 Then Throw New InvalidArgumentException("Complex tanh pole")
+            Return New ComplexNumber(h * Math.Cosh(Real) / denominator, s * c / denominator)
+        End If
+        Dim t As Double = Math.Exp(-2.0 * Math.Abs(Real))
+        Dim denominator As Double = (1.0 - t) * (1.0 - t) + 4.0 * t * c * c
+        Dim realValue As Double = (1.0 - t) * (1.0 + t) / denominator
+        If Real < 0.0 Then realValue = -realValue
+        Return New ComplexNumber(realValue, 4.0 * t * s * c / denominator)
+    End Function
+
+    Public Function Asin() As ComplexNumber
+        RequireComplex(Me)
+        Return ComplexInverseSine(Real, Imaginary, False)
+    End Function
+
+    Public Function Acos() As ComplexNumber
+        RequireComplex(Me)
+        Return ComplexInverseSine(Real, Imaginary, True)
+    End Function
+
+    Public Function Asinh() As ComplexNumber
+        RequireComplex(Me)
+        Dim rotated As ComplexNumber = ComplexInverseSine(-Imaginary, Real, False)
+        Return New ComplexNumber(rotated.Imaginary, -rotated.Real)
+    End Function
+
+    Public Function Acosh() As ComplexNumber
+        RequireComplex(Me)
+        Dim angle As ComplexNumber = ComplexInverseSine(Real, Imaginary, True)
+        Dim imaginaryValue As Double = angle.Real
+        If Imaginary < 0.0 Then imaginaryValue = -imaginaryValue
+        Return New ComplexNumber(Math.Abs(angle.Imaginary), imaginaryValue)
+    End Function
+
+    Public Function Atanh() As ComplexNumber
+        RequireComplex(Me)
+        Dim a As Double = Math.Abs(Real)
+        Dim b As Double = Math.Abs(Imaginary)
+        If a = 1.0 And b = 0.0 Then Throw New InvalidArgumentException("Complex atanh pole")
+        Dim scale As Double = Math.Max(a, b)
+        Dim realValue As Double
+        Dim imaginaryValue As Double
+        If scale > 1e150 Then
+            Dim u As Double = a / scale
+            Dim v As Double = b / scale
+            realValue = (u / (u * u + v * v)) / scale
+            imaginaryValue = Math.Pi / 2.0
+        Else
+            Dim d As Double = ComplexHypot(1.0 - a, b)
+            If d < 1e-150 Then
+                realValue = 0.5 * (ComplexLogHypot(1.0 + a, b) - Math.Log(d))
+            Else
+                realValue = 0.25 * ComplexLogOnePlus((4.0 * a / d) / d)
+            End If
+            imaginaryValue = 0.5 * Math.Atan2(2.0 * b, (1.0 - a) * (1.0 + a) - b * b)
+        End If
+        If Real < 0.0 Then realValue = -realValue
+        If Imaginary < 0.0 Then imaginaryValue = -imaginaryValue
+        Return New ComplexNumber(realValue, imaginaryValue)
+    End Function
+
+    Public Function Atan() As ComplexNumber
+        RequireComplex(Me)
+        Dim rotated As New ComplexNumber(-Imaginary, Real)
+        Dim inverse As ComplexNumber = rotated.Atanh()
+        Return New ComplexNumber(inverse.Imaginary, -inverse.Real)
+    End Function
+
+    Public Function Power(exponent As ComplexNumber) As ComplexNumber
+        RequireComplex(exponent)
+        Return Log().Multiply(exponent).Exp()
+    End Function
+End Class
+
+Public Function ComplexFromPolar(radius As Double, angle As Double) As ComplexNumber
+    RequireFiniteComplexPart(radius)
+    RequireFiniteComplexPart(angle)
+    If radius < 0.0 Then Throw New InvalidArgumentException("Complex radius must be nonnegative")
+    Return New ComplexNumber(radius * Math.Cos(angle), radius * Math.Sin(angle))
+End Function

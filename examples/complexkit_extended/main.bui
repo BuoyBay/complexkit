@@ -1,0 +1,10 @@
+Import complexkit
+
+Sub Main()
+    Dim z As New ComplexNumber(0.3, 0.4)
+    Dim inverse As ComplexNumber = z.Asinh()
+    Dim recovered As ComplexNumber = inverse.Sinh()
+    If Math.Abs(recovered.Real - z.Real) > 1e-12 Then Throw New Exception("real round trip")
+    If Math.Abs(recovered.Imaginary - z.Imaginary) > 1e-12 Then Throw New Exception("imaginary round trip")
+    Print "ComplexKit inverse hyperbolic round trip passed"
+End Sub
