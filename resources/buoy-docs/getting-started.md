@@ -17,7 +17,7 @@ Place the sealed `complexkit-0.1.0.buipkg` archive in your project's `packages/`
 
 Construct complex operands or call `ComplexFromPolar`, then retain the fresh results from arithmetic methods. Angles are radians. Read `Magnitude()` and `Argument()` for polar reporting.
 
-```buoy
+```basic
 Import complexkit
 
 Sub Main()

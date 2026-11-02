@@ -25,12 +25,12 @@ This is an independent implementation of the documented mathematical behavior.
 | Sinh/Cosh/Tanh, Asin/Acos/Atan, Asinh/Acosh/Atanh | Principal finite-component methods |
 | Cot, Sec, Cosec | Deferred |
 | Operator overloads and implicit conversion | Deferred |
-| Original GUI testbench | Console example and automated mathematical tests |
+| Original GUI testbench | Console usage example |
 
 A focused math package fills a reusable Double complex arithmetic gap without
 requiring renderer or OS bridges. The original complete API remains a larger
-compatibility project. Tests verify this package’s stated semantics, not binary
-parity with the original testbench.
+compatibility project. Compatibility is limited to the stated mathematical semantics; binary parity
+with the original testbench is outside the package contract.
 
 ## Extended algorithms (independently written)
 
@@ -59,12 +59,5 @@ Sinh/cosh products use ordinary real hyperbolics below 20 and
 `sign*exp(|x|-log(2)+log(|factor|))` above it (the omitted exponential
 correction is below Double precision). Tanh uses a sum of squares for small
 real parts and `exp(-2*|x|)` scaling for large ones. All public results pass
-through the existing finite-component constructor. Python stdlib `cmath` is
-an independent test oracle, not implementation source or a runtime dependency.
-
-A second test oracle uses Python Decimal at 100 digits: real hyperbolics from
-exp(±x), inverse hyperbolics from real log/sqrt identities, and inverse trig
-from a real atan alternating series after half-angle reduction. Pi is evaluated
-with Machin's identity `16*atan(1/5)-4*atan(1/239)`. This independently checks
-axis values and rotations without calling cmath. Test tolerances allow Double
-rounding and documented subnormal loss; they do not establish correct rounding.
+through the finite-component constructor. Double rounding and subnormal loss
+remain possible; correct rounding is not guaranteed.

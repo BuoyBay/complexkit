@@ -339,8 +339,6 @@ No parameters.
 | --- |
 | `ComplexNumber` |
 
-## ComplexKit functions
-
 ### ComplexFromPolar
 
 `Public Function ComplexFromPolar(radius As Double, angle As Double) As ComplexNumber`

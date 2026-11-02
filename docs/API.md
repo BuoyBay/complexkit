@@ -30,12 +30,11 @@ zero; trigonometric and exponential intermediates may overflow even when a
 rearranged formula could produce a finite result. There are no tolerance-based
 equality, text parsing, implicit scalar arithmetic or operator overloads.
 
-## Build and verify
+## Package use
 
-Maintainers run the private validation suite before release. See the repository README for public build instructions.
-
-The sealed local artifact is `packages/complexkit-0.1.0.buipkg`. It has not been
-published to a registry. See [provenance and original parity](../PROVENANCE.md).
+Install the source package with BPM, or place a sealed ComplexKit archive in the
+consumer project's `packages/` directory. No extra native math library is needed.
+See [source and API parity](../PROVENANCE.md) for the implementation's scope.
 
 ## Extended principal functions
 
@@ -62,5 +61,3 @@ and logarithmic asymptotes to avoid overflow and cancellation. Subnormal results
 can underflow or lose relative accuracy. Huge trigonometric arguments inherit
 stdlib argument reduction accuracy. Existing `Sin`, `Cos`, `Tan`, arithmetic and
 `Exp` retain their documented intermediate-overflow limits.
-
-Maintainers run the private validation suite before release. See the repository README for public build instructions.

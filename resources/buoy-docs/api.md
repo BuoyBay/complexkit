@@ -42,11 +42,9 @@ Constructors and methods reject nonfinite components, Nil operands, and overflow
 - [Getting started](getting-started.md)
 - [API reference](api.md)
 
-
 [Full typed API: properties, parameters, defaults, and returns](typed-api.md)
 
 ## Extended branch and numerical contracts
-
 
 The inverse functions accept every finite complex input except `Atanh(±1)`
 and `Atan(±i)`, which reject with `InvalidArgumentException`. `Tanh` rejects
@@ -71,5 +69,3 @@ and logarithmic asymptotes to avoid overflow and cancellation. Subnormal results
 can underflow or lose relative accuracy. Huge trigonometric arguments inherit
 stdlib argument reduction accuracy. Existing `Sin`, `Cos`, `Tan`, arithmetic and
 `Exp` retain their documented intermediate-overflow limits.
-
-Maintainers run the private validation suite before release. See the repository README for public build instructions.
