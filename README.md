@@ -1,4 +1,4 @@
-# Complex arithmetic and principal elementary functions
+# Complex numbers and principal elementary functions
 
 Pure Buoy Double complex arithmetic inspired by [Roger Meier's Complex Utilities](https://opensource.the-meiers.org/).
 `Import complexkit` exposes `ComplexNumber` and `ComplexFromPolar(radius, angle)`.
